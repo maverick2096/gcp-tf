@@ -1,0 +1,26 @@
+[
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique user identifier"
+  },
+  {
+    "name": "event_timestamp",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Event time"
+  },
+  {
+    "name": "event_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Type of event"
+  },
+  {
+    "name": "metadata",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Additional JSON metadata"
+  }
+]
