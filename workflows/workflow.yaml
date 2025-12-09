@@ -1,0 +1,9 @@
+main:
+  params: [input]
+  steps:
+    - log:
+        call: sys.log
+        args:
+          text: "Workflow started"
+    - return_output:
+        return: "Success: Workflow executed"
