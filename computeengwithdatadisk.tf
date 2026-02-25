@@ -15,26 +15,67 @@ provider "google" {
 }
 
 locals {
-  # Disk map per instance: mount_point -> {size_gb, type}
-  instance_disks = {
-    xxxxcmvltma01 = {
-      opt_commvault = { mount = "/opt/Commvault",     size = 128, type = "pd-balanced" }
-      commvault_ddb = { mount = "/commvault_ddb",     size = 300, type = "pd-ssd"      }
-      commvault_idx = { mount = "/commvault_index",   size = 250, type = "pd-ssd"      }
-    }
-    ge4cmvltvsa01 = {
-      commvault     = { mount = "/Commvault",         size = 400, type = "pd-balanced" }
-      opt_commvault = { mount = "/opt/Commvault",     size = 12,  type = "pd-balanced" }
+  vm_name = "xxxxcmvltma01"
+
+  disks = {
+    opt_commvault = { mount = "/opt/Commvault",   size = 128, type = "pd-balanced" }
+    commvault_ddb = { mount = "/commvault_ddb",   size = 300, type = "pd-ssd"      }
+    commvault_idx = { mount = "/commvault_index", size = 250, type = "pd-ssd"      }
+  }
+}
+
+resource "google_compute_disk" "data" {
+  for_each = local.disks
+
+  name = "${local.vm_name}-${each.key}"
+  zone = var.zone
+  type = each.value.type
+  size = each.value.size
+
+  labels = {
+    role = "commvault"
+    vm   = local.vm_name
+  }
+}
+
+resource "google_compute_instance" "this" {
+  name         = local.vm_name
+  zone         = var.zone
+  machine_type = var.machine_type
+
+  boot_disk {
+    initialize_params {
+      image = var.boot_image
+      size  = var.boot_disk_size_gb
+      type  = "pd-balanced"
     }
   }
 
-  # Flatten for disk resources
-  disk_list = flatten([
-    for vm, disks in local.instance_disks : [
-      for k, d in disks : {
-        vm         = vm
-        disk_key   = k
-        mount      = d.mount
+  network_interface {
+    network    = var.network
+    subnetwork = var.subnetwork
+  }
+
+  dynamic "attached_disk" {
+    for_each = local.disks
+    content {
+      source      = google_compute_disk.data[attached_disk.key].id
+      device_name = "data-${attached_disk.key}"
+    }
+  }
+
+  metadata_startup_script = templatefile("${path.module}/startup-mount.sh.tftpl", {
+    disks = {
+      for k, v in local.disks :
+      "data-${k}" => v.mount
+    }
+  })
+
+  labels = {
+    role = "commvault"
+    name = local.vm_name
+  }
+}        mount      = d.mount
         size       = d.size
         type       = d.type
       }
