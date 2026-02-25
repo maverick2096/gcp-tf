@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# disks = map(device_name -> mount_point)
-# device names become /dev/disk/by-id/google-<device_name>
-
 log() { echo "[startup-mount] $*"; }
+
+# If your VM has repo access (Satellite/Internet), this ensures mkfs.xfs exists.
+if ! command -v mkfs.xfs >/dev/null 2>&1; then
+  log "Installing xfsprogs (best-effort)"
+  dnf -y install xfsprogs || true
+fi
 
 %{ for dev, mnt in disks ~}
 DEVICE="/dev/disk/by-id/google-${dev}"
@@ -12,9 +14,8 @@ MOUNTPOINT="${mnt}"
 
 log "Processing ${DEVICE} -> ${MOUNTPOINT}"
 
-# Wait for device to appear
-for i in $(seq 1 60); do
-  if [ -b "${DEVICE}" ]; then break; fi
+for i in $(seq 1 90); do
+  [ -b "${DEVICE}" ] && break
   sleep 1
 done
 
@@ -25,25 +26,18 @@ fi
 
 mkdir -p "${MOUNTPOINT}"
 
-# If not formatted, format as XFS (recommended for large volumes)
 if ! blkid "${DEVICE}" >/dev/null 2>&1; then
   log "Formatting ${DEVICE} as XFS"
   mkfs.xfs -f "${DEVICE}"
-else
-  log "${DEVICE} already has a filesystem"
 fi
 
 UUID="$(blkid -s UUID -o value "${DEVICE}")"
 FSTAB_LINE="UUID=${UUID} ${MOUNTPOINT} xfs defaults,nofail 0 2"
+grep -q "UUID=${UUID}" /etc/fstab || echo "${FSTAB_LINE}" >> /etc/fstab
 
-if ! grep -q "UUID=${UUID}" /etc/fstab; then
-  log "Adding to /etc/fstab: ${FSTAB_LINE}"
-  echo "${FSTAB_LINE}" >> /etc/fstab
-fi
+mountpoint -q "${MOUNTPOINT}" || mount "${MOUNTPOINT}"
 
-log "Mounting ${MOUNTPOINT}"
-mount -a
-
+command -v restorecon >/dev/null 2>&1 && restorecon -Rv "${MOUNTPOINT}" || true
 %{ endfor ~}
 
 log "Done."
