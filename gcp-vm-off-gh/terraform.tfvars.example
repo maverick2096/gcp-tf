@@ -1,0 +1,73 @@
+###############################################################################
+# Example values — copy to terraform.tfvars and fill in your own.
+###############################################################################
+
+project_id    = "my-gcp-project"
+region        = "us-central1"
+zone          = "us-central1-a"
+instance_name = "my-vm"
+network       = "default"
+subnetwork    = "default"
+
+# Machine & Image
+machine_type  = "e2-medium"
+image_family  = "debian-12"
+image_project = "debian-cloud"
+
+# Boot disk
+disk_size_gb = 50
+disk_type    = "pd-balanced"
+
+# Scaling
+num_instances = 1
+
+# IAM
+service_account_email  = ""   # leave empty to use the default compute SA
+service_account_scopes = ["cloud-platform"]
+
+# Networking
+network_tags = ["allow-ssh", "allow-http"]
+
+# Metadata
+enable_oslogin = true
+metadata       = {}
+
+# Startup script (optional)
+startup_script = <<-SCRIPT
+  #!/bin/bash
+  apt-get update -y
+  apt-get install -y nginx
+  systemctl enable --now nginx
+SCRIPT
+
+# Labels
+labels = {
+  env     = "dev"
+  team    = "platform"
+  managed = "terraform"
+}
+
+# ---------------------------------------------------------------------------
+# Additional data disks
+# ---------------------------------------------------------------------------
+# No extra disks (default):
+# additional_disks = []
+
+# 2 data disks — minimal (size only):
+# additional_disks = [
+#   { disk_size_gb = 100 },
+#   { disk_size_gb = 200 },
+# ]
+
+# 4 data disks — mixed types and custom names:
+# additional_disks = [
+#   { disk_size_gb = 100, disk_type = "pd-balanced", disk_name = "app-data-1" },
+#   { disk_size_gb = 100, disk_type = "pd-balanced", disk_name = "app-data-2" },
+#   { disk_size_gb = 500, disk_type = "pd-ssd",      disk_name = "db-data-1" },
+#   { disk_size_gb = 500, disk_type = "pd-ssd",      disk_name = "db-data-2" },
+# ]
+
+additional_disks = [
+  { disk_size_gb = 100 },
+  { disk_size_gb = 200 },
+]
