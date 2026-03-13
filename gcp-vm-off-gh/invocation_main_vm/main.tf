@@ -1,40 +1,106 @@
-###############################################################################
-# Root / Caller main.tf
-# All values are passed directly in the module invocation block.
-###############################################################################
-
 terraform {
-  required_version = ">= 1.3"
+  required_version = ">= 1.5.0"
 
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = ">= 5.0, < 7.0"
+      version = ">= 6.0"
+    }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = ">= 6.0"
     }
   }
 }
 
 provider "google" {
-  project = "my-gcp-project"
-  region  = "us-central1"
+  project = "my-gcp-project-id"
+  region  = "asia-south1"
+  zone    = "asia-south1-a"
 }
 
-module "gcp_vm" {
-  source = "./gcp-vm-module"
+provider "google-beta" {
+  project = "my-gcp-project-id"
+  region  = "asia-south1"
+  zone    = "asia-south1-a"
+}
 
-  # ── Required ────────────────────────────────────────────────────────────────
-  project_id = "my-gcp-project"
-  region     = "us-central1"
-  zone       = "us-central1-a"
-  hostname   = "my-vm"
-  subnetwork = "projects/my-gcp-project/regions/us-central1/subnetworks/default"
+module "vm" {
+  source = "./modules/gcp-vm-wrapper"
 
-  # ── Machine & OS ────────────────────────────────────────────────────────────
-  machine_type         = "e2-medium"
+  project_id = "my-gcp-project-id"
+  region     = "asia-south1"
+  zone       = "asia-south1-a"
+
+  hostname     = "app-vm-01"
+  machine_type = "e2-standard-4"
+
+  # Use either network or subnetwork as per your setup.
+  network            = ""
+  subnetwork         = "projects/my-gcp-project-id/regions/asia-south1/subnetworks/my-subnet"
+  subnetwork_project = "my-gcp-project-id"
+
+  # Boot disk
+  source_image         = ""
   source_image_family  = "debian-12"
   source_image_project = "debian-cloud"
+  boot_disk_size_gb    = 50
+  boot_disk_type       = "pd-balanced"
+  boot_disk_labels = {
+    role = "boot"
+  }
 
-  # ── Boot Disk ───────────────────────────────────────────────────────────────
+  # Data disks:
+  # 2 disks example -> [100, 200]
+  # 4 disks example -> [100, 200, 500, 1000]
+  data_disk_sizes_gb = [100, 200, 500, 1000]
+  data_disk_type     = "pd-balanced"
+  data_disk_labels = {
+    role = "data"
+  }
+  data_disks_auto_delete = true
+
+  # Networking
+  assign_public_ip = false
+  nat_ip           = null
+  network_tier     = "PREMIUM"
+
+  # Metadata / tags / labels
+  metadata = {
+    enable-oslogin = "TRUE"
+  }
+
+  startup_script = <<-EOT
+    #!/bin/bash
+    echo "VM is ready" > /tmp/vm-ready.txt
+  EOT
+
+  tags = ["ssh", "app"]
+  labels = {
+    env   = "dev"
+    owner = "platform"
+  }
+
+  # IAM
+  service_account_email = "vm-sa@my-gcp-project-id.iam.gserviceaccount.com"
+  service_account_scopes = [
+    "cloud-platform"
+  ]
+
+  deletion_protection = false
+}
+
+output "instance_name" {
+  value = module.vm.instance_name
+}
+
+output "instance_self_links" {
+  value = module.vm.instances_self_links
+}
+
+output "data_disk_layout" {
+  value = module.vm.data_disk_layout
+}  # ── Boot Disk ───────────────────────────────────────────────────────────────
   disk_size_gb = 50
   disk_type    = "pd-balanced"
 
